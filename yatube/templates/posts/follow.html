@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Лента автора{% endblock %}
+{% block content %}
+  <main> 
+  <div class="container py-5">
+    {% include 'posts/includes/switcher.html' with follow=True %}    
+    {% for post in page_obj %}
+      {% include 'posts/includes/post_list.html' %}
+      <a href="{% url 'posts:post_detail' post.pk %}">подробная информация </a>
+      <li>
+      {% if post.group %}   
+        <!--  все записи группы -->
+        <a href="{% url 'posts:group_list' post.group.slug %}">
+          {{ post.group }}
+        </a> 
+      {% endif %}
+      </ul>
+      {% if not forloop.last %}<hr>{% endif %}
+    {% endfor %}
+  </div>
+  </main>
+{% include 'posts/includes/paginator.html' %}
+{% endblock %}

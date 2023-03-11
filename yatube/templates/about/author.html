@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+{% load static %}
+<h1>  Привет, я автор</h1>
+<p>
+  <img src="{% static 'img/sentelek.jpg' %}" width="672" height="504" class="d-inline-block align-top" alt="">
+</p>
+<div class="container py-5">
+  <h2>Я рыбачу только в горах!</h2>
+  <p>Это фото на перевале "Теплый" в 5 км от деревни Сентелек в Алтайском крае.</p>
+  <p>Совсем недалеко протекает горная река Чарыш. Вот на этой реке я и рыбачу!</p>
+</div>  
+{% endblock %}
