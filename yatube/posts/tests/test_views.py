@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.conf import settings
 from ..models import Group, Post, Comment, Follow
 from django.core.cache import cache
+from ..forms import PostForm
 
 User = get_user_model()
 # Создаем временную папку для медиа-файлов;
@@ -43,27 +44,25 @@ class PaginatorViewsTest(TestCase):
                         reverse('posts:group_list',
                                 kwargs={'slug': f'{self.group.slug}'}))
 
-        clients = (self.guest_client, self.authorized_client)
-        for client_select in clients:
-            for page in pages:
-                response1 = client_select.get(page)
-                response2 = client_select.get(page + '?page=2')
-                count_posts1 = len(response1.context['page_obj'])
-                count_posts2 = len(response2.context['page_obj'])
-                error_name1 = (
-                    f'Ошибка количества постов: {count_posts1},'
-                    f' должно {settings.POSTS_PER_PAGE}')
-                error_name2 = (
-                    f'Ошибка количества постов: {count_posts2},'
-                    f'должно {settings.TEST_OF_POST -settings.POSTS_PER_PAGE}')
-                self.assertEqual(
-                    count_posts1,
-                    settings.POSTS_PER_PAGE,
-                    error_name1)
-                self.assertEqual(
-                    count_posts2,
-                    settings.TEST_OF_POST - settings.POSTS_PER_PAGE,
-                    error_name2)
+        for page in pages:
+            response1 = self.guest_client.get(page)
+            response2 = self.guest_client.get(page + '?page=2')
+            count_posts1 = len(response1.context['page_obj'])
+            count_posts2 = len(response2.context['page_obj'])
+            error_name1 = (
+                f'Ошибка количества постов: {count_posts1},'
+                f' должно {settings.POSTS_PER_PAGE}')
+            error_name2 = (
+                f'Ошибка количества постов: {count_posts2},'
+                f'должно {settings.TEST_OF_POST -settings.POSTS_PER_PAGE}')
+            self.assertEqual(
+                count_posts1,
+                settings.POSTS_PER_PAGE,
+                error_name1)
+            self.assertEqual(
+                count_posts2,
+                settings.TEST_OF_POST - settings.POSTS_PER_PAGE,
+                error_name2)
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
@@ -156,15 +155,21 @@ class ViewsTest(TestCase):
 
     def test_post_create_page_show_correct_context(self):
         """Шаблон сформирован с правильным контекстом."""
-        """Спасибо за ревью! С уважением Ваш ученик :-) """
+        # Тест страницы создания и редактирования
         templates_page_names = (
             (reverse('posts:post_create'), type(None)),
             (reverse('posts:post_edit',
                      kwargs={'post_id': self.post.id}), Post))
         for path, clazz in templates_page_names:
             response = self.authorized_client.get(path)
+            # наличие переменной post в контексте
             self.assertIn("post", response.context)
+            # тип и значение переменной post
             self.assertIsInstance(response.context["post"], clazz)
+            # проверяем наличие формы и ее тип
+            self.assertIn('form', response.context)
+            self.assertIsInstance(response.context["form"], PostForm)
+            # Может быть я ошибся :-(
 
     def test_post_added_correctly(self):
         """Пост при создании добавлен корректно++++++++++"""
@@ -188,7 +193,19 @@ class ViewsTest(TestCase):
         self.assertIn(post, group, 'поста нет в группе')
         self.assertIn(post, profile, 'поста нет в профайле')
 
-    def test_post_added_correctly_user2(self):
+    def test_profile_page_context_is_correct(self):
+        response = self.authorized_client.get(
+            reverse('posts:profile',
+                    kwargs={'username': f'{self.user.username}'}))
+        self.check_context_contains_page_or_post(response.context, True)
+
+    def test_group_page_context_is_correct(self):
+        response = self.authorized_client.get(
+            reverse('posts:group_list',
+                    kwargs={'slug': f'{self.group.slug}'}))
+        self.check_context_contains_page_or_post(response.context, True)
+
+    def test_other_group_does_not_have_the_post(self):
         """пост не попал в группу, для которой не был предназначен"""
         group2 = Group.objects.create(
             title='Дополнительная группа',
@@ -206,6 +223,20 @@ class ViewsTest(TestCase):
         self.assertEqual(group, posts_count, 'поста нет в другой группе')
         self.assertNotIn(post, profile,
                          'поста нет в группе другого пользователя')
+
+    def test_post_with_image_appears_in_pages(self):
+        templates_page_names = {
+            reverse('posts:profile',
+                    kwargs={'username': f'{self.user.username}'}): False,
+            reverse('posts:group_list',
+                    kwargs={'slug': f'{self.group.slug}'}): False,
+            reverse('posts:index'): False,
+            reverse(
+                'posts:post_detail',
+                kwargs={'post_id': self.post.id}): True}
+        for path in templates_page_names:
+            response = self.guest_client.get(path)
+            self.check_context_contains_page_or_post(response.context, True)
 
     def test_cache_context(self):
         '''Проверка кэширования страницы index'''
@@ -226,7 +257,7 @@ class ViewsTest(TestCase):
         # Третий шаг
         response_3 = self.authorized_client.get(reverse('posts:index'))
         posts_3 = response_3.content
-        # Проверка очистки эша
+        # Проверка очистки кэша
         self.assertNotEqual(posts_3, posts_2)
 
 
@@ -246,6 +277,12 @@ class CommentTest(TestCase):
                                         group=self.group,
                                         author=self.user)
 
+    # Уважаемый ревьювер! Денис, я не понял про тесты
+    # def test_authorized_user_can_publish_comment(self):
+    # def test_unauthorized_user_cant_publish_comment(self):
+    # спросил в пачке и наставник предположил что речь идет о
+    # тестах из test_forms.py
+    # Пожалуйста можно уточнить вопрос. Спасибо.
     def test_post_detail_page_show_correct_context(self):
         """Правильный контекст комментария"""
         self.comment = Comment.objects.create(
