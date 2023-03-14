@@ -252,14 +252,8 @@ class ViewsTest(TestCase):
 
     def test_cache_context(self):
         '''Проверка кэширования страницы index'''
-        # У нас уже есть одна запись Post созданная в def setUp(self)
-        # мы можем её удалить для отсутствия записей
-        # Post.objects.get(pk=self.post.id).delete()
-        # Если так, тогда создаем "первый" пост
-        # Post.objects.create(author=self.user, text='Текст кэша 1',
-        # group=self.group)
         # Создаем пост
-        Post.objects.create(
+        post2 = Post.objects.create(
             author=self.user,
             text='Текст поста для кэша',
             group=self.group)
@@ -269,7 +263,8 @@ class ViewsTest(TestCase):
         # получаем контекст_1
         context_1 = response_1.content
         # удаляем существующий пост
-        Post.objects.get(pk=self.post.id).delete()
+        post2.delete()
+        # Post.objects.get(pk=self.post.id).delete()
         # делаем запрос 2
         response_2 = self.authorized_client.get(
             reverse('posts:index'))

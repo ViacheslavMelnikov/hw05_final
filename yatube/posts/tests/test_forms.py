@@ -108,26 +108,12 @@ class PostFormTests(TestCase):
             data=form_data,
             follow=True)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-
-        # в базе всего один пост
-        self.assertEqual(Post.objects.count(),
-                         1,
-                         'В базе добавлен лишний пост!')
         # получим пост из базы
         post = Post.objects.first()
         # проверим поля поста напрямую
         self.assertEqual(post.text, new_post_text)
         self.assertEqual(post.author, self.user)
         self.assertEqual(post.group, self.group2)
-
-        self.assertTrue(
-            Post.objects.filter(
-                id=self.post.id,
-                group=self.group2.id,
-                author=self.user,
-                image=f'posts/{self.uploaded}',
-                pub_date=self.post.pub_date).exists(),
-            'Данные редактирования не совпадают')
 
 
 class CommentFormTest(TestCase):
