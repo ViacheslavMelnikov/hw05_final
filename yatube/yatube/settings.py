@@ -42,12 +42,11 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
+    'django.contrib.staticfiles', # Приложение staticfiles необходимо для работы приложения DjDT
     'users.apps.UsersConfig',
     'core.apps.CoreConfig',
     'about.apps.AboutConfig',  # Добавленная запись
     'sorl.thumbnail',  # для работы с картинками
-    'django.contrib.staticfiles', # Приложение staticfiles необходимо для работы приложения DjDT
     'debug_toolbar',
 ]
 
