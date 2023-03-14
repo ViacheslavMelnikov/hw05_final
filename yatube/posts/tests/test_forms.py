@@ -68,7 +68,6 @@ class PostFormTests(TestCase):
         )
 
         '''Проверка создания поста'''
-        posts_count = Post.objects.count()
         form_data = {'text': text_post,
                      'group': self.group.id,
                      'image': self.uploaded}
@@ -87,9 +86,9 @@ class PostFormTests(TestCase):
                         image=f'posts/{self.uploaded}',
                         author=self.user
                         ).exists(), 'Ошибка создания поста')
-        self.assertEqual(Post.objects.count(),
-                         posts_count + 1,
-                         'Записи в базе данных нет')
+        self.assertEqual(Post.objects.count(), 1,
+                         f'Ожидаем в базе 1 пост, '
+                         f'но в базе {Post.objects.count()} постов')
 
     def test_can_edit_post(self):
         '''Проверка редактирования'''
@@ -100,7 +99,9 @@ class PostFormTests(TestCase):
         self.group2 = Group.objects.create(title='Группа Б',
                                            slug='group_b',
                                            description='Описание Б')
-        form_data = {'text': text_post + '1',
+        # просто напечатал на бегу. С переменной конечно лучше!
+        new_post_text = 'Новый тестовый пост для проверки'
+        form_data = {'text': new_post_text,
                      'group': self.group2.id}
         response = self.authorized_client.post(
             reverse('posts:post_edit', kwargs={'post_id': self.post.id}),
@@ -115,15 +116,9 @@ class PostFormTests(TestCase):
         # получим пост из базы
         post = Post.objects.first()
         # проверим поля поста напрямую
-        self.assertEqual(post.text, text_post + '1')
+        self.assertEqual(post.text, new_post_text)
         self.assertEqual(post.author, self.user)
         self.assertEqual(post.group, self.group2)
-        # проверим, что пост пропал со страницы старой группы
-        self.assertEqual(
-            Post.objects.filter(
-                id=self.post.id,
-                group=self.group.id).count(), 0,
-            'Пост остался в прежней группе')
 
         self.assertTrue(
             Post.objects.filter(

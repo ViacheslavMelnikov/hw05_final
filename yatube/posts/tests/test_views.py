@@ -30,7 +30,7 @@ class PaginatorViewsTest(TestCase):
 
     def test_correct_page_context_guest_client(self):
         # Проверка количества постов на первой и второй страницах
-        # Посты для теста пагинации создаем в самом тесте
+        # Посты для теста пагинации создаем в самом тесте == 13
         bilk_post: list = []
         for i in range(settings.TEST_OF_POST):
             bilk_post.append(Post(text=f'Тестовый текст {i}',
@@ -44,25 +44,26 @@ class PaginatorViewsTest(TestCase):
                         reverse('posts:group_list',
                                 kwargs={'slug': f'{self.group.slug}'}))
 
+        # Прикольно получилось! Спасибо!
+        # Честно говоря на учебе идешь по накатанной дорожке
+        # а кривая дорожка гораздо прямее накатанной!!!
+        # Спасибо!
+        paginations = (
+            (1, settings.POSTS_PER_PAGE),
+            (2, settings.TEST_OF_POST - settings.POSTS_PER_PAGE)
+        )
+
         for page in pages:
-            response1 = self.guest_client.get(page)
-            response2 = self.guest_client.get(page + '?page=2')
-            count_posts1 = len(response1.context['page_obj'])
-            count_posts2 = len(response2.context['page_obj'])
-            error_name1 = (
-                f'Ошибка количества постов: {count_posts1},'
-                f' должно {settings.POSTS_PER_PAGE}')
-            error_name2 = (
-                f'Ошибка количества постов: {count_posts2},'
-                f'должно {settings.TEST_OF_POST -settings.POSTS_PER_PAGE}')
-            self.assertEqual(
-                count_posts1,
-                settings.POSTS_PER_PAGE,
-                error_name1)
-            self.assertEqual(
-                count_posts2,
-                settings.TEST_OF_POST - settings.POSTS_PER_PAGE,
-                error_name2)
+            for page_no, expected_count in paginations:
+                response = self.guest_client.get(page, {"page": page_no})
+                count_posts = len(response.context['page_obj'])
+                error_name = (
+                    f'Ошибка количества постов: {count_posts},'
+                    f' должно {expected_count}')
+                self.assertEqual(
+                    count_posts,
+                    expected_count,
+                    error_name)
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
@@ -152,6 +153,15 @@ class ViewsTest(TestCase):
         response = self.guest_client.get(
             reverse('posts:post_detail', kwargs={'post_id': self.post.id}))
         self.check_context_contains_page_or_post(response.context, True)
+        # Уважаемый ревьювер, Денис! У меня в post_detail 'author' не
+        # передается напрямую, он находится в 'post'
+        # разве это не аналогичные строки?
+        # self.assertEqual(response.context['post'].author, self.user)
+        # self.assertEqual(response.context['author'], TestPosts.user)
+        # это из check_context_contains_page_or_post
+        # а, вот как self.assertIn('author', response.context) сделать
+        # эту проверку если 'post' неитеррабельный? я наверное туплю...
+        # пробовал self.assertIn('author', response.context['post'])
 
     def test_post_create_page_show_correct_context(self):
         """Шаблон сформирован с правильным контекстом."""
@@ -198,6 +208,8 @@ class ViewsTest(TestCase):
             reverse('posts:profile',
                     kwargs={'username': f'{self.user.username}'}))
         self.check_context_contains_page_or_post(response.context, True)
+        self.assertIn('author', response.context)
+        self.assertEqual(response.context['author'], self.user)
 
     def test_group_page_context_is_correct(self):
         response = self.authorized_client.get(
@@ -240,25 +252,38 @@ class ViewsTest(TestCase):
 
     def test_cache_context(self):
         '''Проверка кэширования страницы index'''
-        # Первый шаг
-        response_1 = self.authorized_client.get(
-            reverse('posts:index'))
-        posts_1 = response_1.content
+        # У нас уже есть одна запись Post созданная в def setUp(self)
+        # мы можем её удалить для отсутствия записей
+        # Post.objects.get(pk=self.post.id).delete()
+        # Если так, тогда создаем "первый" пост
+        # Post.objects.create(author=self.user, text='Текст кэша 1',
+        # group=self.group)
+        # Создаем пост
         Post.objects.create(
             author=self.user,
             text='Текст поста для кэша',
             group=self.group)
-        # Второй шаг
-        response_2 = self.authorized_client.get(reverse('posts:index'))
-        posts_2 = response_2.content
-        self.assertEqual(posts_2, posts_1)
+        # делаем запрос 1
+        response_1 = self.authorized_client.get(
+            reverse('posts:index'))
+        # получаем контекст_1
+        context_1 = response_1.content
+        # удаляем существующий пост
+        Post.objects.get(pk=self.post.id).delete()
+        # делаем запрос 2
+        response_2 = self.authorized_client.get(
+            reverse('posts:index'))
+        # получаем контекст_2
+        context_2 = response_2.content
+        # сравниваем контекст_1 == контекст_2
+        self.assertEqual(context_1, context_2)
         # Очистка
         cache.clear()
         # Третий шаг
         response_3 = self.authorized_client.get(reverse('posts:index'))
-        posts_3 = response_3.content
+        context_3 = response_3.content
         # Проверка очистки кэша
-        self.assertNotEqual(posts_3, posts_2)
+        self.assertNotEqual(context_3, context_2)
 
 
 class CommentTest(TestCase):
@@ -277,12 +302,7 @@ class CommentTest(TestCase):
                                         group=self.group,
                                         author=self.user)
 
-    # Уважаемый ревьювер! Денис, я не понял про тесты
-    # def test_authorized_user_can_publish_comment(self):
-    # def test_unauthorized_user_cant_publish_comment(self):
-    # спросил в пачке и наставник предположил что речь идет о
-    # тестах из test_forms.py
-    # Пожалуйста можно уточнить вопрос. Спасибо.
+    # Уважаемый ревьювер! Денис, Спасибо! :-)
     def test_post_detail_page_show_correct_context(self):
         """Правильный контекст комментария"""
         self.comment = Comment.objects.create(
